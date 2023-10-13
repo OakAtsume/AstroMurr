@@ -1,0 +1,18 @@
+[21:39:40]: Found wlan0
+[21:39:40]: Failed to set IP address on wlan0
+[21:40:33]: Found wlan0
+[21:40:33]: Failed to set IP address on wlan0
+[21:41:53]: Found wlan0
+[21:41:53]: Failed to set IP address on wlan0
+[21:41:55]: Found wlan0
+[21:41:55]: Failed to set IP address on wlan0
+[21:41:56]: Found wlan0
+[21:41:56]: Failed to set IP address on wlan0
+[21:41:57]: Found wlan0
+[21:41:57]: Failed to set IP address on wlan0
+[21:41:58]: Found wlan0
+[21:41:58]: Failed to set IP address on wlan0
+[21:42:24]: Found wlan0
+[21:42:24]: Failed to set IP address on wlan0
+[21:42:32]: Found wlan0
+[21:42:32]: Failed to set IP address on wlan0
