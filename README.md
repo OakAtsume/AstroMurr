@@ -18,7 +18,6 @@ Welcome to the AstroMurr Project! This Ruby-based project is designed to simplif
 ### Prerequisites
 - [Ruby](https://www.ruby-lang.org/en/downloads/) (>= 2.6.3)
 - [Bundler](https://bundler.io/) (>= 2.0.2)
-- [Aircrack-ng](https://www.aircrack-ng.org/) (>= 1.5.2)
 - [Hostapd](https://w1.fi/hostapd/) (>= 2.9)
 - [Dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html) (>= 2.80)
 - Iwconfig
@@ -61,6 +60,14 @@ ruby astromurr.rb wlan1 "Hello World WiFi" 11 MyStrongPassword
 | SSID | The SSID to broadcast for the Rogue Access Point. |
 | Channel | The channel to broadcast the Rogue Access Point on (Only 2.4 is currently supported). |
 | Password | The password to use for the Rogue Access Point (Optional). |
+
+## Troubleshooting
+### Common Issues
+- Ensure you are running the application as root.
+- Ensure you have the required dependencies installed.
+- Ensure you don't have task's running on ports 53, 67, or 80.
+- Ensure you killed wpa_supplicant, NetworkManager,dhcpcd, and any other network services. (These can interfere with the Rogue Access Point)
+
 
 ## License
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for more information.
