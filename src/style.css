@@ -1,178 +1,165 @@
-/* 
-
-.container::after {
-	content: "";
-	display: table;
-	clear: both;
-}
-
-.login {
-	width: 100%;
-	max-width: 360px;
-	margin: 0 auto;
-	padding: 80px 0 40px;
-	box-sizing: border-box;
-}
-
-.login .login-header {
-	margin-bottom: 40px;
-	text-align: center;
-}
-
-.input-group {
-	margin-bottom: 24px;
-}
-
-.input-group label {
-	display: block;
-	margin-bottom: 8px;
-}
-
-.input-group .text {
-	width: 100%;
-	height: 40px;
-	padding: 0 10px;
-	box-sizing: border-box;
-	border: 1px solid #ccc;
-	border-radius: 4px;
-}
-
-.input-group .text:focus {
-	outline: none;
-	border-color: #777;
-}
-
-.input-group .password {
-	width: 100%;
-	height: 40px;
-	padding: 0 10px;
-	box-sizing: border-box;
-	border: 1px solid #ccc;
-	border-radius: 4px;
-}
-
-.input-group .password:focus {
-	outline: none;
-	border-color: #777;
-}
-
-.input-group .login-footer {
-	margin-top: 24px;
-	text-align: center;
-}
-
-.input-group .login-footer a {
-	color: #777;
-	text-decoration: none;
-}
-
-.input-group .login-footer a:hover {
-	text-decoration: underline;
-}
-
-.input-group .submit-button {
-	width: 100%;
-	height: 40px;
-	border: none;
-	background: #777;
-	color: #fff;
-	border-radius: 4px;
-	cursor: pointer;
-} */
-
-
-* {
-	margin: 0;
-	padding: 0;
-	box-sizing: border-box;
-	animation: ease-in-out 5s infinite;
-}
+/* @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,300;1,400;1,500;1,600;1,700;1,800&display=swap');
+ */
 
 body {
-	font-family: "Open Sans", sans-serif;
-	font-size: 14px;
-	line-height: 1.6;
-	color: #777;
-	background: #eee;
+	margin: 0;
+	padding: 0;
+	background-size: cover;
+	font-family: 'Open Sans', sans-serif;
 }
 
-.container {
-	/* Smack-center of the page */
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	height: 100vh;
-}
-
-.login-form {
-	width: 25%;
-
-	/* 	margin: 0 auto;
-	padding: 80px 0 40px;
+.box {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 30rem;
+	padding: 3.5rem;
 	box-sizing: border-box;
-	border: 1px solid #ccc;
-	border-radius: 10%;
-	background: #777;
-	color: #fff;
-	 */
+	border: 1px solid #dadce0;
+	-webkit-border-radius: 8px;
+	border-radius: 8px;
+
 }
 
-.login-form .logo {
-	margin-bottom: 40px;
+.box h2 {
+	margin: 0px 0 -0.125rem;
+	padding: 0;
+	text-align: center;
+	color: #202124;
+	font-size: 24px;
+	font-weight: 400;
+}
+
+
+.box p {
+	font-size: 16px;
+	font-weight: 400;
+	letter-spacing: 1px;
+	line-height: 1.5;
+	margin-bottom: 24px;
 	text-align: center;
 }
 
-.login-form .login-txt,
-.login-passwd {
-	/* Add spacing between and align to center of div */
-	display: flex;
-	width: 100%;
-	height: 50px;
+.box .inputBox {
+	position: relative;
+}
+
+.box .inputBox input {
+	width: 95%;
+	padding: 5% 10px;
+	font-size: 1rem;
+	letter-spacing: 0.062rem;
 	margin-bottom: 5%;
-	border-radius: 5%;
-	border-color: transparent;
+	border: 1px solid #ccc;
+	background: transparent;
+	border-radius: 5px;
 }
 
-.login-form .login-txt:focus,
-.login-passwd:focus {
-	border-color: #777;
-	box-shadow: 0 0 5px #777;
+.box .inputBox label {
+	position: absolute;
+	top: 0;
+	margin-top: 2%;
+	left: 10px;
+	padding: 0.625rem 0;
+	font-size: 1rem;
+	color: gray;
+	pointer-events: none;
+	transition: 0.5s;
 }
 
+.box .inputBox input:focus~label,
+.box .inputBox input:valid~label,
+.box .inputBox input:not([value=""])~label {
+	top: -1.125rem;
+	left: 10px;
+	color: #1a73e8;
+	font-size: 0.75rem;
+	background-color: #fff;
+	height: 1px;
+	padding-left: 5px;
+	padding-right: 5px;
+}
 
-.login-form .submit-button {
-	width: 100%;
-	height: 40px;
+.box .inputBox input:focus {
+	outline: none;
+	border: 2px solid #1a73e8;
+}
+
+.box input[type="submit"] {
 	border: none;
-	background: #777;
+	outline: none;
 	color: #fff;
-	border-radius: 4px;
+	background-color: #1a73e8;
+	padding: 0.625rem 1.25rem;
 	cursor: pointer;
-	/* animation: ease-in-out 5s infinite; */
+	border-radius: 0.312rem;
+	font-size: 1rem;
+	float: right;
 }
 
-.login-form .submit-button:hover {
-	/* Animation */
-	background-color: black;
-	animation: ease-in-out 5s infinite;
+.box input[type="submit"]:hover {
+	background-color: #287ae6;
+	box-shadow: 0 1px 1px 0 rgba(66, 133, 244, 0.45), 0 1px 3px 1px rgba(66, 133, 244, 0.3);
 }
 
-.login-form .login-footer {
-	margin-top: 24px;
-	text-align: center;
-}
-
-.login-form .register {
-	margin-top: 24px;
-	text-align: center;
-}
-
-
-.login-form .login-footer a {
-	color: #777;
+.forgot-mail {
+	/* <a> tag "Forgot email?" */
 	text-decoration: none;
+	color: #1a73e8;
+	font-size: 15px;
+
 }
 
-.login-form .login-footer a:hover {
-	text-decoration: underline;
+.forgot-mail-2 {
+	text-decoration: none;
+	color: #1a73e8;
+	font-size: 15px;
+	margin-bottom: 25%;
+
+}
+
+.not-ur-pc {
+	/* <a> tag "Not your computer?" */
+	padding-bottom: 15%;
+	padding-top: 15%;
+}
+
+.not-ur-pc p {
+	display: inline;
+	color: rgb(95, 99, 104);
+	font-size: 14px;
+}
+
+.not-ur-pc a {
+	text-decoration: none;
+	color: #1a73e8;
+	font-size: 15px;
+}
+
+.create-account {
+	/* <a> tag "Create account" */
+	text-decoration: none;
+	color: #1a73e8;
+}
+
+.create-account a {
+	text-decoration: none;
+	color: #1a73e8;
+	font-size: .875rem;
+}
+
+.logo {
+	/* set the padding */
+	display: block;
+	width: 75px;
+	height: 50px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+
+.show-password {
+	/* <a> tag "Show password" */
+	margin-bottom: 25%;
 }

