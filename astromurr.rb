@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative('libs/decoder')
 require('socket')
 require('json')
@@ -180,7 +182,7 @@ LogThread = Thread.start do
   end
 end
 
-httpThread = Thread.start do
+Thread.start do
   handler = TCPServer.new(8080)
   lastemail = ''
   loop do

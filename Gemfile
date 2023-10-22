@@ -1,5 +1,7 @@
-source "https://rubygems.org"
+# frozen_string_literal: true
 
-gem "packetfu"
-gem "openssl"
-gem "json"
+source 'https://rubygems.org'
+
+gem 'json'
+gem 'openssl'
+gem 'packetfu'
