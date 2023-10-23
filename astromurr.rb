@@ -169,7 +169,7 @@ LogThread = Thread.start do
     next if lastestHost.nil?
 
     lastestHost.chomp!
-    Log.debug("HOST: #{lastestHost}") unless lastestHost.empty?
+    # Log.debug("HOST: #{lastestHost}") unless lastestHost.empty?
     if lastestHost.include?('AP-STA-CONNECTED')
       data = lastestHost.split(' ')
       mac = data[2]
@@ -183,7 +183,7 @@ LogThread = Thread.start do
 end
 
 Thread.start do
-  handler = TCPServer.new(8080)
+  handler = TCPServer.new(80)
   lastemail = ''
   loop do
     Thread.start(handler.accept) do |client|
