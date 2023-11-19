@@ -32,6 +32,7 @@ DnsConf = "/tmp/#{Random.rand(1000..9999)}_dns.conf"
 HostapdConf = "/tmp/#{Random.rand(1000..9999)}_hostapd.conf"
 DhcpLog = "/tmp/#{Random.rand(1000..9999)}_dhcp.log"
 HostapdLog = "/tmp/#{Random.rand(1000..9999)}_hostapd.log"
+
 hostLog = nil
 dhcpLog = nil
 hostThread = nil
@@ -54,8 +55,19 @@ if Password.nil?
     f.puts("ssid=#{Essid}")
     f.puts("channel=#{Channel}")
     f.puts('hw_mode=g')
-    # f.puts('macaddr_acl=0')
-    f.puts('ignore_broadcast_ssid=0')
+    f.puts('ieee80211w=2') # Enable PMF (optional for added security)
+    f.puts('owe_transition=1') # Enable Enhanced Open (OWE)
+    # f.puts("interface=#{Interface}")
+    # f.puts('driver=nl80211')
+    # f.puts("ssid=#{Essid}")
+    # f.puts("channel=#{Channel}")
+    # f.puts('hw_mode=g')
+    # # f.puts('macaddr_acl=0')
+    # f.puts('ignore_broadcast_ssid=0')
+    # f.puts('ieee80211w=2') # Enable PMF (optional for added security)
+    # f.puts('owe_transition=1') # Enable Enhanced Open (OWE)
+
+
   end
 else
   Log.warn("Network(\e[1m#{Essid}\e[0m) -> Password(\e[1m#{Password}\e[0m)")
