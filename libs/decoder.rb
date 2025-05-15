@@ -28,6 +28,17 @@ $Settings = {
   ]
 }
 
+COLORA = {
+  :reset     => "\e[0m",
+  :bold      => "\e[1m",
+  :italic    => "\e[3m",
+  :underline => "\e[4m",
+  :blink     => "\e[5m",
+  :reverse   => "\e[7m",
+  :hidden    => "\e[8m"
+}
+
+
 class Log4Bot
   def initialize(time)
     @timeformat = time
@@ -36,50 +47,50 @@ class Log4Bot
 
   def log(message)
     print "\e[38;2;0;211;0m[#{Time.now.strftime(@timeformat)}]:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def error(message)
     print "\e[38;2;255;0;0m[#{Time.now.strftime(@timeformat)}]-Error:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def warn(message)
     print "\e[38;2;200;0;0m[#{Time.now.strftime(@timeformat)}]-Warn:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def info(message)
     print "\e[38;2;0;0;255m[#{Time.now.strftime(@timeformat)}]-Info:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def debug(message)
     print "\e[38;2;255;255;0m[#{Time.now.strftime(@timeformat)}]-Debug:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def dns(message)
     print "\e[38;2;255;0;255mDNS:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def hostapd(message)
     print "\e[38;2;255;0;255mWireless:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def dhcp(message)
     print "\e[38;2;255;0;255mDHCP:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
   def http(message)
     print "\e[38;2;255;0;255mHTTP:\e[0m #{message}\e[0m\n"
-    File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
+    # File.open('log.txt', 'a') { |f| f.write("[#{Time.now.strftime(@timeformat)}]: #{message}\n") }
   end
 
-  def Logo
+  def showlogo()
     logo = File.read('libs/logo.txt')
     # Generate a random color
     color = "\e[38;2;#{Random.rand(0..255)};#{Random.rand(0..255)};#{Random.rand(0..255)}m"
@@ -87,10 +98,11 @@ class Log4Bot
     logo = logo.split("\n")
     logo.each do |line|
       line.gsub!('[Project-Name]', 'Astromurr')
-      line.gsub!('[Version]', 'v1.0.0 - Semi-Stable')
+      line.gsub!('[Version]', 'v2.0.0 - Semi-Stable')
       print "#{color}#{line}\n"
       color = "\e[38;2;#{Random.rand(0..255)};#{Random.rand(0..255)};#{Random.rand(0..255)}m"
     end
+    print("\e[0m")
   end
 end
 
